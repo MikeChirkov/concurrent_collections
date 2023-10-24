@@ -1,22 +1,15 @@
 package ru.example;
 
 import java.util.Random;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.*;
 
 public class Main {
-    private static final int LENGTH_OF_WORDS = 10_000;
+    public static final int LENGTH_OF_WORDS = 10_000;
     private static final BlockingQueue<String> symbolsA = new ArrayBlockingQueue<>(100);
     private static final BlockingQueue<String> symbolsB = new ArrayBlockingQueue<>(100);
     private static final BlockingQueue<String> symbolsC = new ArrayBlockingQueue<>(100);
-    private static String maxA = "";
-    private static String maxB = "";
-    private static String maxC = "";
-    private static int maxCountA = 0;
-    private static int maxCountB = 0;
-    private static int maxCountC = 0;
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
 
         Thread fillThread = new Thread(() -> {
             for (int i = 0; i < LENGTH_OF_WORDS; i++) {
@@ -32,60 +25,21 @@ public class Main {
         });
         fillThread.start();
 
-        Thread aCalculateThread = new Thread(() -> {
-            try {
-                for (int i = 0; i < LENGTH_OF_WORDS; i++) {
-                    String tmp = symbolsA.take();
-                    int count = getCountByLetter(tmp, 'a');
-                    if (count > maxCountA) {
-                        maxCountA = count;
-                        maxA = tmp;
-                    }
-                }
+        ExecutorService threadPool = Executors.newFixedThreadPool(25);
 
-            } catch (InterruptedException e) {
-            }
-        });
-        aCalculateThread.start();
-
-        Thread bCalculateThread = new Thread(() -> {
-            try {
-                for (int i = 0; i < LENGTH_OF_WORDS; i++) {
-                    String tmp = symbolsB.take();
-                    int count = getCountByLetter(tmp, 'b');
-                    if (count > maxCountB) {
-                        maxCountB = count;
-                        maxB = tmp;
-                    }
-                }
-            } catch (InterruptedException e) {
-            }
-        });
-        bCalculateThread.start();
-
-        Thread cCalculateThread = new Thread(() -> {
-            try {
-                for (int i = 0; i < LENGTH_OF_WORDS; i++) {
-                    String tmp = symbolsC.take();
-                    int count = getCountByLetter(tmp, 'a');
-                    if (count > maxCountC) {
-                        maxCountC = count;
-                        maxC = tmp;
-                    }
-                }
-            } catch (InterruptedException e) {
-            }
-        });
-        cCalculateThread.start();
+        Callable<NameValue> myCallableA = new MyCallable(symbolsA, 'a');
+        Callable<NameValue> myCallableB = new MyCallable(symbolsB, 'b');
+        Callable<NameValue> myCallableC = new MyCallable(symbolsC, 'c');
+        Future<NameValue> newFutureA = threadPool.submit(myCallableA);
+        Future<NameValue> newFutureB = threadPool.submit(myCallableB);
+        Future<NameValue> newFutureC = threadPool.submit(myCallableC);
 
         fillThread.join();
-        aCalculateThread.join();
-        bCalculateThread.join();
-        cCalculateThread.join();
+        threadPool.shutdown();
 
-        System.out.println(getCountByLetter(maxA, 'a'));
-        System.out.println(getCountByLetter(maxB, 'b'));
-        System.out.println(getCountByLetter(maxC, 'c'));
+        System.out.println(newFutureA.get().getName() + " " + newFutureA.get().getValue());
+        System.out.println(newFutureB.get().getName() + " " + newFutureB.get().getValue());
+        System.out.println(newFutureC.get().getName() + " " + newFutureC.get().getValue());
     }
 
     private static String generateText(String letters, int length) {
@@ -95,10 +49,6 @@ public class Main {
             text.append(letters.charAt(random.nextInt(letters.length())));
         }
         return text.toString();
-    }
-
-    private static int getCountByLetter(String text, char let) {
-        return (int) text.chars().filter(c -> c == let).count();
     }
 
 }
